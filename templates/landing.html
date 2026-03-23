@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NMITS — Network Monitoring & Issue Ticketing System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #04050a;
+      --bg2:     #080c14;
+      --bg3:     #0c1220;
+      --accent:  #00f0ff;
+      --accent2: #0099aa;
+      --green:   #00ff88;
+      --amber:   #ffb800;
+      --red:     #ff3d57;
+      --purple:  #a78bfa;
+      --text:    #e2eaf8;
+      --dim:     #4a5a78;
+      --border:  #111a2e;
+      --border2: #1a2840;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Cursor glow */
+    .cursor-glow {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(0,240,255,0.06) 0%, transparent 70%);
+      position: fixed; pointer-events: none; border-radius: 50%;
+      transform: translate(-50%,-50%); z-index: 0;
+    }
+
+    /* Noise */
+    body::before {
+      content:''; position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      opacity:.4; pointer-events:none; z-index:1;
+    }
+
+    /* Grid */
+    .grid-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,240,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,240,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 0 5%; height: 68px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(4,5,10,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 20px; letter-spacing: 3px; color: var(--accent);
+      text-decoration: none;
+    }
+    .nav-logo-icon {
+      width: 32px; height: 32px;
+      border: 2px solid var(--accent); border-radius: 6px;
+      display: grid; place-items: center; font-size: 16px;
+      animation: rotatePulse 4s ease-in-out infinite;
+    }
+    @keyframes rotatePulse {
+      0%,100% { box-shadow: 0 0 8px var(--accent); }
+      50%      { box-shadow: 0 0 22px var(--accent); }
+    }
+
+    .nav-right { display: flex; align-items: center; gap: 28px; }
+
+    .nav-links { display: flex; align-items: center; gap: 28px; list-style: none; }
+    .nav-links a {
+      font-family: 'DM Mono', monospace; font-size: 12px;
+      color: var(--dim); text-decoration: none;
+      letter-spacing: 1px; text-transform: uppercase; transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+
+    .nav-cta {
+      background: var(--accent); color: var(--bg) !important;
+      padding: 8px 20px; border-radius: 4px;
+      font-weight: 600 !important; transition: all .2s !important;
+    }
+    .nav-cta:hover { background: #00d4e0 !important; box-shadow: 0 0 20px rgba(0,240,255,0.4) !important; }
+
+    /* Profile chip in nav */
+    .nav-profile {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 40px;
+      padding: 5px 14px 5px 6px;
+      text-decoration: none;
+      transition: border-color .2s, box-shadow .2s;
+      cursor: pointer;
+    }
+    .nav-profile:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(0,240,255,0.12);
+    }
+    .nav-profile-avatar {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 14px; color: var(--bg);
+    }
+    .nav-profile-info { display: flex; flex-direction: column; }
+    .nav-profile-name {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 13px; color: var(--text); line-height: 1.2;
+    }
+    .nav-profile-role {
+      font-family: 'DM Mono', monospace; font-size: 9px;
+      color: var(--accent); text-transform: uppercase; letter-spacing: 1px;
+    }
+
+    /* Dropdown on profile */
+    .profile-wrapper { position: relative; }
+    .profile-dropdown {
+      display: none;
+      position: absolute; top: calc(100% + 10px); right: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      min-width: 180px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      z-index: 200;
+    }
+    .profile-wrapper:hover .profile-dropdown { display: block; }
+    .dropdown-item {
+      display: block; padding: 12px 16px;
+      font-family: 'DM Mono', monospace; font-size: 12px;
+      color: var(--dim); text-decoration: none;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s, color .15s;
+      letter-spacing: .5px;
+    }
+    .dropdown-item:last-child { border-bottom: 0; }
+    .dropdown-item:hover { background: var(--bg3); color: var(--accent); }
+    .dropdown-item.logout { color: var(--red); }
+    .dropdown-item.logout:hover { background: rgba(255,61,87,.06); color: var(--red); }
+
+    section { position: relative; z-index: 2; }
+
+    /* ── OWNER BADGE ── */
+    .owner-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(167,139,250,0.07);
+      border: 1px solid rgba(167,139,250,0.25);
+      border-radius: 20px; padding: 5px 14px;
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      color: var(--purple); letter-spacing: 1px;
+      margin-bottom: 14px;
+      animation: fadeUp .8s ease both;
+    }
+    .owner-dot {
+      width: 6px; height: 6px;
+      background: var(--purple); border-radius: 50%;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 120px 5% 80px;
+    }
+
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,240,255,0.06);
+      border: 1px solid rgba(0,240,255,0.2);
+      border-radius: 20px; padding: 6px 16px;
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
+      margin-bottom: 32px;
+      animation: fadeUp .8s .1s ease both;
+    }
+    .tag-dot {
+      width: 6px; height: 6px; background: var(--green);
+      border-radius: 50%; animation: blink 1.4s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+    .hero-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(48px, 8vw, 96px); font-weight: 800;
+      line-height: 1.0; letter-spacing: -2px; margin-bottom: 24px;
+      animation: fadeUp .8s .15s ease both;
+    }
+    .hero-title .line1 { display: block; color: #fff; }
+    .hero-title .line2 {
+      display: block;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 50%, var(--green) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 18px; color: var(--dim);
+      max-width: 560px; margin: 0 auto 48px; line-height: 1.7;
+      animation: fadeUp .8s .2s ease both;
+    }
+
+    .hero-actions {
+      display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+      animation: fadeUp .8s .3s ease both;
+    }
+
+    .btn-primary {
+      background: var(--accent); color: var(--bg);
+      padding: 14px 32px; border-radius: 4px;
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 14px; letter-spacing: 1px; text-decoration: none;
+      transition: all .2s; box-shadow: 0 0 30px rgba(0,240,255,0.2);
+    }
+    .btn-primary:hover { background: #00d4e0; box-shadow: 0 0 50px rgba(0,240,255,0.4); transform: translateY(-2px); }
+
+    .btn-ghost {
+      background: transparent; color: var(--text);
+      padding: 14px 32px; border-radius: 4px;
+      border: 1px solid var(--border2);
+      font-family: 'Syne', sans-serif; font-weight: 600;
+      font-size: 14px; letter-spacing: 1px; text-decoration: none; transition: all .2s;
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+
+    /* Hero visual mockup */
+    .hero-visual {
+      margin-top: 80px; width: 100%; max-width: 900px;
+      animation: fadeUp .8s .4s ease both;
+    }
+    .dashboard-mockup {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 12px; overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(0,240,255,0.05), 0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(0,240,255,0.05);
+    }
+    .mockup-bar {
+      background: var(--bg3); padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .mockup-dot { width:10px; height:10px; border-radius:50%; }
+    .dot-r { background:#ff5f57; } .dot-y { background:#febc2e; } .dot-g { background:#28c840; }
+    .mockup-url { flex:1; text-align:center; font-family:'DM Mono',monospace; font-size:11px; color:var(--dim); }
+    .mockup-body { padding:24px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+    .mock-stat { background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:16px; border-left:3px solid var(--accent); }
+    .mock-stat.green { border-left-color:var(--green); }
+    .mock-stat.red   { border-left-color:var(--red); }
+    .mock-stat.amber { border-left-color:var(--amber); }
+    .mock-stat-val { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:#fff; }
+    .mock-stat-label { font-family:'DM Mono',monospace; font-size:9px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+    .mockup-devices { padding:0 24px 24px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .mock-device { background:var(--bg3); border:1px solid var(--border); border-top:2px solid var(--green); border-radius:6px; padding:12px; }
+    .mock-device.down { border-top-color:var(--red); }
+    .mock-dev-name { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; margin-bottom:2px; }
+    .mock-dev-ip { font-family:'DM Mono',monospace; font-size:10px; color:var(--dim); margin-bottom:8px; }
+    .mock-dev-badge { display:inline-block; padding:2px 7px; border-radius:3px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; }
+    .badge-up   { background:rgba(0,255,136,.1); color:var(--green); border:1px solid rgba(0,255,136,.3); }
+    .badge-down { background:rgba(255,61,87,.1);  color:var(--red);   border:1px solid rgba(255,61,87,.3); }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      padding: 60px 5%; display:flex; justify-content:center; gap:0;
+      border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+      background: var(--bg2);
+    }
+    .stat-item {
+      flex:1; max-width:200px; text-align:center; padding:0 40px;
+      border-right:1px solid var(--border);
+      opacity:0; transform:translateY(20px); transition:opacity .5s, transform .5s;
+    }
+    .stat-item:last-child { border-right:0; }
+    .stat-item.visible { opacity:1; transform:translateY(0); }
+    .stat-num {
+      font-family:'Syne',sans-serif; font-size:48px; font-weight:800;
+      background:linear-gradient(135deg, var(--accent), var(--green));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      line-height:1; margin-bottom:8px;
+    }
+    .stat-desc { font-family:'DM Mono',monospace; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; }
+
+    /* ── FEATURES ── */
+    .features { padding:120px 5%; max-width:1200px; margin:0 auto; }
+    .section-label { font-family:'DM Mono',monospace; font-size:11px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; margin-bottom:16px; }
+    .section-title { font-family:'Syne',sans-serif; font-size:clamp(32px,5vw,52px); font-weight:800; letter-spacing:-1px; line-height:1.1; margin-bottom:16px; color:#fff; }
+    .section-sub { font-size:16px; color:var(--dim); max-width:500px; margin-bottom:64px; line-height:1.7; }
+    .features-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; background:var(--border); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .feature-card { background:var(--bg2); padding:36px 32px; opacity:0; transform:translateY(24px); transition:opacity .5s, transform .5s, background .2s; }
+    .feature-card.visible { opacity:1; transform:translateY(0); }
+    .feature-card:hover { background:var(--bg3); }
+    .feat-icon { width:48px; height:48px; border-radius:10px; display:grid; place-items:center; font-size:22px; margin-bottom:20px; }
+    .feat-icon.cyan   { background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.2); }
+    .feat-icon.green  { background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.2); }
+    .feat-icon.amber  { background:rgba(255,184,0,0.08);  border:1px solid rgba(255,184,0,0.2); }
+    .feat-icon.purple { background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.2); }
+    .feat-icon.red    { background:rgba(255,61,87,0.08);  border:1px solid rgba(255,61,87,0.2); }
+    .feat-icon.blue   { background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.2); }
+    .feat-title { font-family:'Syne',sans-serif; font-size:18px; font-weight:700; margin-bottom:10px; color:#fff; }
+    .feat-desc  { font-size:14px; color:var(--dim); line-height:1.7; }
+
+    /* ── HOW IT WORKS ── */
+    .how-it-works { padding:120px 5%; background:var(--bg2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .how-inner { max-width:1000px; margin:0 auto; }
+    .steps-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:40px; margin-top:64px; }
+    .step { position:relative; opacity:0; transform:translateY(24px); transition:opacity .5s, transform .5s; }
+    .step.visible { opacity:1; transform:translateY(0); }
+    .step-num { font-family:'Syne',sans-serif; font-size:80px; font-weight:800; color:var(--border2); line-height:1; margin-bottom:-10px; }
+    .step-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; color:#fff; margin-bottom:10px; }
+    .step-desc { font-size:14px; color:var(--dim); line-height:1.7; }
+    .step-connector { position:absolute; top:40px; right:-20px; color:var(--border2); font-size:24px; }
+
+    /* ── TECH STACK ── */
+    .tech-stack { padding:120px 5%; max-width:1200px; margin:0 auto; }
+    .tech-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:64px; }
+    .tech-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:28px 24px; text-align:center; opacity:0; transform:translateY(20px); transition:opacity .5s, transform .5s, border-color .2s; }
+    .tech-card.visible { opacity:1; transform:translateY(0); }
+    .tech-card:hover { border-color:var(--accent2); transform:translateY(-4px) !important; }
+    .tech-emoji { font-size:36px; margin-bottom:12px; }
+    .tech-name { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:#fff; margin-bottom:6px; }
+    .tech-role { font-family:'DM Mono',monospace; font-size:11px; color:var(--dim); }
+
+    /* ── CTA ── */
+    .cta-section { padding:120px 5%; text-align:center; background:var(--bg2); border-top:1px solid var(--border); position:relative; overflow:hidden; }
+    .cta-glow { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:600px; height:300px; background:radial-gradient(ellipse, rgba(0,240,255,0.07) 0%, transparent 70%); pointer-events:none; }
+    .cta-section .section-sub { margin:0 auto 48px; text-align:center; }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 32px 5%;
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .footer-top {
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 16px;
+      margin-bottom: 20px; padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .footer-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:18px; letter-spacing:3px; color:var(--accent); }
+    .footer-links { display:flex; gap:24px; }
+    .footer-links a { font-family:'DM Mono',monospace; font-size:11px; color:var(--dim); text-decoration:none; text-transform:uppercase; letter-spacing:1px; transition:color .2s; }
+    .footer-links a:hover { color:var(--accent); }
+    .footer-bottom {
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .footer-owner {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .owner-avatar {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--purple), var(--accent));
+      border-radius: 50%; display: grid; place-items: center;
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 14px; color: var(--bg);
+    }
+    .owner-info { display: flex; flex-direction: column; }
+    .owner-name { font-family:'Syne',sans-serif; font-weight:700; font-size:13px; color:var(--text); }
+    .owner-title { font-family:'DM Mono',monospace; font-size:10px; color:var(--purple); letter-spacing:1px; }
+    .footer-copy { font-family:'DM Mono',monospace; font-size:11px; color:var(--dim); }
+
+    /* Animations */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+    @media (max-width:900px) {
+      .features-grid { grid-template-columns:1fr 1fr; }
+      .steps-grid    { grid-template-columns:1fr; gap:24px; }
+      .tech-grid     { grid-template-columns:repeat(2,1fr); }
+      .mockup-body   { grid-template-columns:repeat(2,1fr); }
+      .mockup-devices{ grid-template-columns:repeat(2,1fr); }
+      .stats-bar     { flex-wrap:wrap; gap:32px; justify-content:center; }
+      .stat-item     { border-right:0; }
+      nav .nav-links { display:none; }
+    }
+    @media (max-width:600px) {
+      .features-grid  { grid-template-columns:1fr; }
+      .tech-grid      { grid-template-columns:repeat(2,1fr); }
+      .hero-title     { letter-spacing:-1px; }
+      .mockup-devices { grid-template-columns:1fr; }
+      .footer-bottom  { flex-direction:column; align-items:flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<div class="grid-bg"></div>
+
+<!-- NAV -->
+<nav>
+  <!-- NMITS logo always goes back to landing page -->
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-icon">◈</div>
+    NMITS
+  </a>
+
+  <div class="nav-right">
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how">How It Works</a></li>
+      <li><a href="#stack">Tech Stack</a></li>
+    </ul>
+
+    {% if current_user.is_authenticated %}
+    <!-- Profile chip with dropdown -->
+    <div class="profile-wrapper">
+      <div class="nav-profile">
+        <div class="nav-profile-avatar">{{ current_user.username[0].upper() }}</div>
+        <div class="nav-profile-info">
+          <span class="nav-profile-name">{{ current_user.username }}</span>
+          <span class="nav-profile-role">{{ current_user.role }}</span>
+        </div>
+      </div>
+      <div class="profile-dropdown">
+        <a href="/dashboard" class="dropdown-item">⬡ &nbsp;Dashboard</a>
+        <a href="/tickets"   class="dropdown-item">✦ &nbsp;My Tickets</a>
+        <a href="/devices"   class="dropdown-item">⬡ &nbsp;Devices</a>
+        <a href="/logout"    class="dropdown-item logout">⏻ &nbsp;Logout</a>
+      </div>
+    </div>
+    {% else %}
+    <ul class="nav-links">
+      <li><a href="/login" class="nav-cta">Launch App →</a></li>
+    </ul>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="owner-badge">
+    <span class="owner-dot"></span>
+    Built by Ankan Bhattacharya
+  </div>
+
+  <div class="hero-tag">
+    <span class="tag-dot"></span>
+    Network Operations Platform
+  </div>
+
+  <h1 class="hero-title">
+    <span class="line1">Monitor. Alert.</span>
+    <span class="line2">Resolve.</span>
+  </h1>
+
+  <p class="hero-sub">
+    A full-stack IT operations platform that monitors your network devices in real time,
+    detects failures instantly, and streamlines issue resolution through structured ticketing.
+  </p>
+
+  <div class="hero-actions">
+    {% if current_user.is_authenticated %}
+    <a href="/dashboard" class="btn-primary">Go to Dashboard →</a>
+    <a href="#features"  class="btn-ghost">Explore Features</a>
+    {% else %}
+    <a href="/login"    class="btn-primary">Launch Dashboard →</a>
+    <a href="/register" class="btn-ghost">Create Account</a>
+    {% endif %}
+  </div>
+
+  <!-- Dashboard Mockup -->
+  <div class="hero-visual">
+    <div class="dashboard-mockup">
+      <div class="mockup-bar">
+        <div class="mockup-dot dot-r"></div>
+        <div class="mockup-dot dot-y"></div>
+        <div class="mockup-dot dot-g"></div>
+        <div class="mockup-url">nmits.onrender.com — Dashboard</div>
+      </div>
+      <div class="mockup-body">
+        <div class="mock-stat">
+          <div class="mock-stat-val">12</div>
+          <div class="mock-stat-label">Total Devices</div>
+        </div>
+        <div class="mock-stat green">
+          <div class="mock-stat-val">9</div>
+          <div class="mock-stat-label">Online</div>
+        </div>
+        <div class="mock-stat red">
+          <div class="mock-stat-val">3</div>
+          <div class="mock-stat-label">Offline</div>
+        </div>
+        <div class="mock-stat amber">
+          <div class="mock-stat-val">7</div>
+          <div class="mock-stat-label">Open Tickets</div>
+        </div>
+      </div>
+      <div class="mockup-devices">
+        <div class="mock-device">
+          <div class="mock-dev-name">Google DNS</div>
+          <div class="mock-dev-ip">8.8.8.8</div>
+          <span class="mock-dev-badge badge-up">UP</span>
+        </div>
+        <div class="mock-device down">
+          <div class="mock-dev-name">Office Router</div>
+          <div class="mock-dev-ip">192.168.1.1</div>
+          <span class="mock-dev-badge badge-down">DOWN</span>
+        </div>
+        <div class="mock-device">
+          <div class="mock-dev-name">Cloudflare</div>
+          <div class="mock-dev-ip">1.1.1.1</div>
+          <span class="mock-dev-badge badge-up">UP</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-num" data-target="99">0</div><div class="stat-desc">Uptime %</div></div>
+  <div class="stat-item"><div class="stat-num" data-target="60">0</div><div class="stat-desc">Second Poll Interval</div></div>
+  <div class="stat-item"><div class="stat-num" data-target="3">0</div><div class="stat-desc">Check Methods</div></div>
+  <div class="stat-item"><div class="stat-num" data-target="10">0</div><div class="stat-desc">Second Graph Refresh</div></div>
+</div>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="section-label">// Core Features</div>
+  <h2 class="section-title">Everything you need<br>for IT operations</h2>
+  <p class="section-sub">Built for network engineers and IT support teams who need reliability, speed, and clarity.</p>
+  <div class="features-grid">
+    <div class="feature-card"><div class="feat-icon cyan">🌐</div><div class="feat-title">Real-Time Monitoring</div><div class="feat-desc">Continuously pings every device using TCP, HTTP, and ICMP checks. Status updates automatically every 60 seconds in the background.</div></div>
+    <div class="feature-card"><div class="feat-icon green">📊</div><div class="feat-title">Live Latency Graph</div><div class="feat-desc">Visual latency chart powered by Chart.js. Auto-refreshes every 10 seconds with per-device filtering and historical trend data.</div></div>
+    <div class="feature-card"><div class="feat-icon amber">🎫</div><div class="feat-title">Ticketing System</div><div class="feat-desc">Create, assign, and track support tickets with priority levels (Low → Critical) and a full status lifecycle from Open to Closed.</div></div>
+    <div class="feature-card"><div class="feat-icon purple">🔐</div><div class="feat-title">Role-Based Access</div><div class="feat-desc">Admin and User roles with separate permissions. Admins manage all tickets and devices; users manage their own issues.</div></div>
+    <div class="feature-card"><div class="feat-icon red">🔔</div><div class="feat-title">Visual Alerts</div><div class="feat-desc">Instant visual indicators when devices go DOWN. Color-coded status tiles with pulse animations highlight critical failures at a glance.</div></div>
+    <div class="feature-card"><div class="feat-icon blue">⚡</div><div class="feat-title">Quick Ping Tool</div><div class="feat-desc">Test any IP or domain instantly from the dashboard without adding it as a device. Get live UP/DOWN status and latency in seconds.</div></div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works" id="how">
+  <div class="how-inner">
+    <div class="section-label">// Workflow</div>
+    <h2 class="section-title">How it works</h2>
+    <p class="section-sub">Simple, fast, and reliable — from device registration to issue resolution.</p>
+    <div class="steps-grid">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-title">Add Devices</div>
+        <div class="step-desc">Register network devices by entering their IP address or domain name. The system immediately begins monitoring them every 60 seconds.</div>
+        <span class="step-connector">→</span>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-title">Detect Issues</div>
+        <div class="step-desc">The background scheduler polls all devices using TCP, HTTP, and ICMP checks. Any failure is immediately flagged as DOWN with visual alerts.</div>
+        <span class="step-connector">→</span>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-title">Raise & Resolve</div>
+        <div class="step-desc">Users create support tickets linked to affected devices. Admins track, comment, and update ticket status through to resolution.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section class="tech-stack" id="stack">
+  <div class="section-label">// Built With</div>
+  <h2 class="section-title">Modern tech stack</h2>
+  <p class="section-sub">Industry-standard tools used by real IT teams worldwide.</p>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="tech-emoji">🐍</div><div class="tech-name">Python Flask</div><div class="tech-role">Backend Framework</div></div>
+    <div class="tech-card"><div class="tech-emoji">🗄️</div><div class="tech-name">MySQL / SQLite</div><div class="tech-role">Database</div></div>
+    <div class="tech-card"><div class="tech-emoji">🎨</div><div class="tech-name">HTML CSS JS</div><div class="tech-role">Frontend</div></div>
+    <div class="tech-card"><div class="tech-emoji">📈</div><div class="tech-name">Chart.js</div><div class="tech-role">Latency Graphs</div></div>
+    <div class="tech-card"><div class="tech-emoji">🔐</div><div class="tech-name">Flask-Login</div><div class="tech-role">Authentication</div></div>
+    <div class="tech-card"><div class="tech-emoji">⏱️</div><div class="tech-name">APScheduler</div><div class="tech-role">Background Jobs</div></div>
+    <div class="tech-card"><div class="tech-emoji">🛡️</div><div class="tech-name">Flask-WTF</div><div class="tech-role">Forms & CSRF</div></div>
+    <div class="tech-card"><div class="tech-emoji">☁️</div><div class="tech-name">Render</div><div class="tech-role">Cloud Deployment</div></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-glow"></div>
+  <div class="section-label">// Get Started</div>
+  <h2 class="section-title">Ready to monitor<br>your network?</h2>
+  <p class="section-sub">Log in and start adding devices to your monitoring dashboard in seconds.</p>
+  <div class="hero-actions">
+    {% if current_user.is_authenticated %}
+    <a href="/dashboard" class="btn-primary">Go to Dashboard →</a>
+    {% else %}
+    <a href="/login"    class="btn-primary">Launch Dashboard →</a>
+    <a href="/register" class="btn-ghost">Create Account</a>
+    {% endif %}
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-logo">◈ NMITS</div>
+    <div class="footer-links">
+      <a href="/login">Dashboard</a>
+      <a href="/register">Register</a>
+      <a href="#features">Features</a>
+      <a href="#how">How It Works</a>
+      <a href="#stack">Tech Stack</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-owner">
+      <div class="owner-avatar">A</div>
+      <div class="owner-info">
+        <span class="owner-name">Ankan Bhattacharya</span>
+        <span class="owner-title">Owner &amp; Developer</span>
+      </div>
+    </div>
+    <div class="footer-copy">© 2024 NMITS — Network Monitoring &amp; Issue Ticketing System</div>
+  </div>
+</footer>
+
+<script>
+// Cursor glow
+document.addEventListener('mousemove', e => {
+  const g = document.getElementById('cursorGlow');
+  g.style.left = e.clientX + 'px';
+  g.style.top  = e.clientY + 'px';
+});
+
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting)
+      setTimeout(() => entry.target.classList.add('visible'), i * 80);
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.feature-card, .step, .tech-card, .stat-item')
+  .forEach(el => observer.observe(el));
+
+// Counter animation
+const counterObs = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    entry.target.querySelectorAll('[data-target]').forEach(el => {
+      const target = parseInt(el.dataset.target);
+      let current  = 0;
+      const step   = target / 40;
+      const timer  = setInterval(() => {
+        current += step;
+        if (current >= target) {
+          el.textContent = target + (target === 99 ? '%' : '');
+          clearInterval(timer);
+        } else {
+          el.textContent = Math.floor(current) + (target === 99 ? '%' : '');
+        }
+      }, 30);
+    });
+    counterObs.unobserve(entry.target);
+  });
+}, { threshold: 0.5 });
+
+const statsBar = document.querySelector('.stats-bar');
+if (statsBar) counterObs.observe(statsBar);
+</script>
+</body>
+</html>
