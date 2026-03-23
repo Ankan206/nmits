@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Devices – NMITS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Network Devices</h1>
+  <button class="btn btn-primary" onclick="toggleModal('addDeviceModal')">+ Add Device</button>
+</div>
+
+<!-- Device Table -->
+<div class="card">
+  <div class="card-body">
+    {% if devices %}
+    <table class="data-table">
+      <thead>
+        <tr><th>Name</th><th>Host / IP</th><th>Status</th><th>Latency</th><th>Last Check</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for d in devices %}
+        {% set log = device_status.get(d.id) %}
+        {% set status = log.status if log else 'UNKNOWN' %}
+        <tr>
+          <td>{{ d.name }}</td>
+          <td class="mono">{{ d.host }}</td>
+          <td><span class="badge badge-{{ status.lower() }}">{{ status }}</span></td>
+          <td class="mono">{{ '%.1f ms'|format(log.latency_ms) if log and log.latency_ms else '—' }}</td>
+          <td class="mono">{{ log.checked_at.strftime('%H:%M:%S') if log else '—' }}</td>
+          <td class="action-cell">
+            <button class="btn btn-sm btn-ghost" onclick="pingDevice('{{ d.host }}', this)">Ping</button>
+            <a href="{{ url_for('device_logs', device_id=d.id) }}" class="btn btn-sm btn-ghost">Logs</a>
+            {% if current_user.is_admin %}
+            <form method="POST" action="{{ url_for('delete_device', device_id=d.id) }}" style="display:inline"
+                  onsubmit="return confirm('Delete this device?')">
+              {{ form.hidden_tag() }}
+              <button type="submit" class="btn btn-sm btn-danger">Del</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No devices yet. Add one above.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add Device Modal -->
+<div id="addDeviceModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Network Device</h2>
+      <button class="modal-close" onclick="toggleModal('addDeviceModal')">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_device') }}">
+      {{ form.hidden_tag() }}
+      <div class="field-group">
+        <label>{{ form.name.label }}</label>
+        {{ form.name(placeholder='e.g. Main Router') }}
+      </div>
+      <div class="field-group">
+        <label>{{ form.host.label }}</label>
+        {{ form.host(placeholder='e.g. 192.168.1.1 or google.com') }}
+      </div>
+      <div class="field-group">
+        <label>{{ form.description.label }}</label>
+        {{ form.description(placeholder='Optional description') }}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="toggleModal('addDeviceModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function pingDevice(host, btn) {
+  btn.textContent = '…';
+  btn.disabled = true;
+  const res  = await fetch('/api/ping', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token() }}'},
+    body: JSON.stringify({host})
+  });
+  const data = await res.json();
+  btn.textContent = data.status === 'UP' ? '🟢 UP' : '🔴 DOWN';
+  setTimeout(() => { btn.textContent='Ping'; btn.disabled=false; }, 3000);
+}
+</script>
+{% endblock %}

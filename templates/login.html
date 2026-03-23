@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Login – NMITS{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">◈ NMITS</div>
+    <h1 class="auth-title">System Access</h1>
+    <p class="auth-sub">Network Monitoring & Issue Ticketing</p>
+
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      <div class="field-group">
+        <label>{{ form.username.label }}</label>
+        {{ form.username(placeholder='Enter username') }}
+      </div>
+      <div class="field-group">
+        <label>{{ form.password.label }}</label>
+        {{ form.password(placeholder='Enter password') }}
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">{{ form.submit.label.text }}</button>
+    </form>
+
+    <p class="auth-link">No account? <a href="{{ url_for('register') }}">Register here</a></p>
+    <div class="auth-hint">Default admin: <code>admin / admin123</code></div>
+  </div>
+</div>
+{% endblock %}

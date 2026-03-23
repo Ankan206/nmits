@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Ticket #{{ ticket.id }} – NMITS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('tickets') }}" class="back-link">← Tickets</a>
+    <h1 class="page-title">
+      <span class="mono text-muted">#{{ ticket.id }}</span> {{ ticket.title }}
+    </h1>
+  </div>
+  <div class="ticket-badges">
+    <span class="badge badge-priority-{{ ticket.priority.lower() }}">{{ ticket.priority }}</span>
+    <span class="badge badge-status-{{ ticket.status.lower().replace(' ','-') }}">{{ ticket.status }}</span>
+  </div>
+</div>
+
+<div class="two-col">
+  <!-- Left: Detail + Comments -->
+  <div class="col-main">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Description</span></div>
+      <div class="card-body">
+        <p>{{ ticket.description }}</p>
+        <div class="ticket-meta">
+          <span>By <strong>{{ ticket.owner.username }}</strong></span>
+          <span class="mono">{{ ticket.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+          {% if ticket.device %}
+          <span>Device: <strong>{{ ticket.device.name }}</strong> ({{ ticket.device.host }})</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Comments ({{ ticket.comments|length }})</span></div>
+      <div class="card-body">
+        {% for c in ticket.comments %}
+        <div class="comment">
+          <div class="comment-meta">
+            <span class="comment-author">{{ c.author.username }}</span>
+            <span class="mono">{{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          </div>
+          <p>{{ c.comment }}</p>
+        </div>
+        {% else %}
+        <p class="empty-state">No comments yet.</p>
+        {% endfor %}
+
+        <form method="POST" action="{{ url_for('add_comment', ticket_id=ticket.id) }}" class="comment-form">
+          {{ comment_form.hidden_tag() }}
+          {{ comment_form.comment(placeholder='Write a comment…', rows=3) }}
+          <button type="submit" class="btn btn-primary">{{ comment_form.submit.label.text }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Actions -->
+  <div class="col-side">
+    {% if current_user.is_admin %}
+    <div class="card">
+      <div class="card-header"><span class="card-title">Update Status</span></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('update_ticket', ticket_id=ticket.id) }}">
+          {{ update_form.hidden_tag() }}
+          <div class="field-group">
+            {{ update_form.status(class='input-field') }}
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">{{ update_form.submit.label.text }}</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Ticket Info</span></div>
+      <div class="card-body info-list">
+        <div class="info-row"><span>ID</span><span class="mono">#{{ ticket.id }}</span></div>
+        <div class="info-row"><span>Priority</span><span>{{ ticket.priority }}</span></div>
+        <div class="info-row"><span>Status</span><span>{{ ticket.status }}</span></div>
+        <div class="info-row"><span>Created</span><span class="mono">{{ ticket.created_at.strftime('%d %b %Y') }}</span></div>
+        <div class="info-row"><span>Updated</span><span class="mono">{{ ticket.updated_at.strftime('%d %b %Y') }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

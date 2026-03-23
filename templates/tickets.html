@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Tickets – NMITS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Support Tickets</h1>
+  <button class="btn btn-primary" onclick="toggleModal('newTicketModal')">+ New Ticket</button>
+</div>
+
+<!-- Ticket Filters -->
+<div class="filter-bar">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="open">Open</button>
+  <button class="filter-btn" data-filter="in-progress">In Progress</button>
+  <button class="filter-btn" data-filter="closed">Closed</button>
+</div>
+
+<!-- Tickets -->
+<div class="card">
+  <div class="card-body">
+    {% if tickets %}
+    <table class="data-table" id="ticketTable">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Priority</th><th>Status</th><th>By</th><th>Created</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for t in tickets %}
+        <tr data-status="{{ t.status.lower().replace(' ','-') }}">
+          <td class="mono">#{{ t.id }}</td>
+          <td>{{ t.title }}</td>
+          <td><span class="badge badge-priority-{{ t.priority.lower() }}">{{ t.priority }}</span></td>
+          <td><span class="badge badge-status-{{ t.status.lower().replace(' ','-') }}">{{ t.status }}</span></td>
+          <td>{{ t.owner.username }}</td>
+          <td class="mono">{{ t.created_at.strftime('%Y-%m-%d') }}</td>
+          <td>
+            <a href="{{ url_for('ticket_detail', ticket_id=t.id) }}" class="btn btn-sm btn-ghost">View</a>
+            {% if current_user.is_admin or t.user_id == current_user.id %}
+            <form method="POST" action="{{ url_for('delete_ticket', ticket_id=t.id) }}" style="display:inline"
+                  onsubmit="return confirm('Delete ticket #{{ t.id }}?')">
+              {{ form.hidden_tag() }}
+              <button type="submit" class="btn btn-sm btn-danger">Del</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No tickets yet. Create one above.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- New Ticket Modal -->
+<div id="newTicketModal" class="modal-overlay hidden">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2>New Support Ticket</h2>
+      <button class="modal-close" onclick="toggleModal('newTicketModal')">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('create_ticket') }}">
+      {{ form.hidden_tag() }}
+      <div class="field-group">
+        <label>{{ form.title.label }}</label>
+        {{ form.title(placeholder='Brief issue title') }}
+      </div>
+      <div class="field-group">
+        <label>{{ form.description.label }}</label>
+        {{ form.description(placeholder='Describe the issue in detail…', rows=5) }}
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label>{{ form.priority.label }}</label>
+          {{ form.priority() }}
+        </div>
+        <div class="field-group">
+          <label>{{ form.device_id.label }}</label>
+          {{ form.device_id() }}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="toggleModal('newTicketModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Status filter
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filter = btn.dataset.filter;
+    document.querySelectorAll('#ticketTable tbody tr').forEach(row => {
+      row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

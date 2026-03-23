@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Logs – {{ device.name }} – NMITS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('devices') }}" class="back-link">← Devices</a>
+    <h1 class="page-title">{{ device.name }} <span class="mono text-muted">{{ device.host }}</span></h1>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Last 100 Checks</span>
+  </div>
+  <div class="card-body">
+    {% if logs %}
+    <table class="data-table">
+      <thead>
+        <tr><th>Time (UTC)</th><th>Status</th><th>Latency</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="mono">{{ log.checked_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td><span class="badge badge-{{ log.status.lower() }}">{{ log.status }}</span></td>
+          <td class="mono">{{ '%.1f ms'|format(log.latency_ms) if log.latency_ms else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No logs yet. The background scheduler will populate data every minute.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

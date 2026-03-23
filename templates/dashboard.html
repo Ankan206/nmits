@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard – NMITS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Network Dashboard</h1>
+  <div class="live-badge"><span class="pulse-dot"></span> LIVE</div>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">⬡</div>
+    <div class="stat-val">{{ stats.total_devices }}</div>
+    <div class="stat-label">Total Devices</div>
+  </div>
+  <div class="stat-card stat-up">
+    <div class="stat-icon">▲</div>
+    <div class="stat-val">{{ stats.up }}</div>
+    <div class="stat-label">Online</div>
+  </div>
+  <div class="stat-card stat-down">
+    <div class="stat-icon">▼</div>
+    <div class="stat-val">{{ stats.down }}</div>
+    <div class="stat-label">Offline</div>
+  </div>
+  <div class="stat-card stat-ticket">
+    <div class="stat-icon">✦</div>
+    <div class="stat-val">{{ stats.open_tickets }}</div>
+    <div class="stat-label">Open Tickets</div>
+  </div>
+</div>
+
+<!-- Quick Ping Tool -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Quick Ping Check</span>
+  </div>
+  <div class="card-body">
+    <div class="ping-row">
+      <input id="pingHost" type="text" class="input-field" placeholder="Enter IP or domain e.g. 8.8.8.8" />
+      <button class="btn btn-primary" onclick="quickPing()">Ping</button>
+    </div>
+    <div id="pingResult" class="ping-result hidden"></div>
+  </div>
+</div>
+
+<!-- Device Status Grid -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Device Status</span>
+    <a href="{{ url_for('devices') }}" class="card-action">Manage →</a>
+  </div>
+  <div class="card-body">
+    {% if devices %}
+    <div class="device-grid" id="deviceGrid">
+      {% for device in devices %}
+      {% set log = device_status.get(device.id) %}
+      {% set status = log.status if log else 'UNKNOWN' %}
+      <div class="device-tile {{ status.lower() }}" data-device-id="{{ device.id }}">
+        <div class="device-status-dot"></div>
+        <div class="device-name">{{ device.name }}</div>
+        <div class="device-host">{{ device.host }}</div>
+        <div class="device-meta">
+          <span class="badge badge-{{ status.lower() }}">{{ status }}</span>
+          {% if log and log.latency_ms %}
+          <span class="latency">{{ '%.1f'|format(log.latency_ms) }} ms</span>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('device_logs', device_id=device.id) }}" class="tile-link">View Logs</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state">No devices added yet. <a href="{{ url_for('devices') }}">Add your first device →</a></p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Real-Time Latency Graph -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Live Latency Graph</span>
+    <div class="graph-controls">
+      <select id="deviceFilter" class="graph-select" onchange="applyDeviceFilter()">
+        <option value="all">All Devices</option>
+      </select>
+      <span class="graph-refresh-info mono">auto-refresh 10s</span>
+    </div>
+  </div>
+  <div class="card-body" style="padding:16px 20px 20px;">
+    <div id="noDataMsg" class="empty-state" style="display:none; padding:30px 0; text-align:center;">
+      No latency data yet — add a device and ping it first, then wait a moment.
+    </div>
+    <canvas id="latencyChart" height="95"></canvas>
+  </div>
+</div>
+
+<!-- Recent Tickets -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Recent Tickets</span>
+    <a href="{{ url_for('tickets') }}" class="card-action">All Tickets →</a>
+  </div>
+  <div class="card-body">
+    {% if tickets %}
+    <table class="data-table">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Priority</th><th>Status</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for t in tickets %}
+        <tr>
+          <td><a href="{{ url_for('ticket_detail', ticket_id=t.id) }}">#{{ t.id }}</a></td>
+          <td>{{ t.title }}</td>
+          <td><span class="badge badge-priority-{{ t.priority.lower() }}">{{ t.priority }}</span></td>
+          <td><span class="badge badge-status-{{ t.status.lower().replace(' ','-') }}">{{ t.status }}</span></td>
+          <td class="mono">{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No tickets yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<script>
+// ── Colour palette for up to 8 devices ───────────────────────────
+const PALETTE = [
+  '#00d4ff', '#00e676', '#ffab00', '#b388ff',
+  '#ff6e6e', '#40c4ff', '#69ff47', '#ffd740'
+];
+
+let latencyChart = null;
+let allStatsData  = {};   // raw data from API  { deviceName: [{t, ms}, ...] }
+let activeFilter  = 'all';
+
+// ── Build / rebuild the Chart.js instance ────────────────────────
+function buildChart(data) {
+  const ctx = document.getElementById('latencyChart').getContext('2d');
+
+  // Collect every unique timestamp across all devices, sorted
+  const allTimestamps = [...new Set(
+    Object.values(data).flat().map(p => p.t)
+  )].sort();
+
+  if (allTimestamps.length === 0) {
+    document.getElementById('noDataMsg').style.display = 'block';
+    document.getElementById('latencyChart').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('noDataMsg').style.display = 'none';
+  document.getElementById('latencyChart').style.display = 'block';
+
+  // Format labels as HH:MM:SS
+  const labels = allTimestamps.map(t => {
+    const d = new Date(t);
+    return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  });
+
+  // One dataset per device
+  const deviceNames = Object.keys(data);
+  const datasets = deviceNames.map((name, i) => {
+    const pointMap = {};
+    data[name].forEach(p => { pointMap[p.t] = p.ms; });
+    return {
+      label: name,
+      data: allTimestamps.map(t => pointMap[t] ?? null),
+      borderColor: PALETTE[i % PALETTE.length],
+      backgroundColor: PALETTE[i % PALETTE.length] + '22',
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      tension: 0.35,
+      fill: false,
+      spanGaps: true,
+    };
+  });
+
+  // Destroy previous instance if exists
+  if (latencyChart) {
+    latencyChart.destroy();
+    latencyChart = null;
+  }
+
+  latencyChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      animation: { duration: 400 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#c8d4e8',
+            font: { family: "'Share Tech Mono', monospace", size: 11 },
+            boxWidth: 14,
+            padding: 16,
+          }
+        },
+        tooltip: {
+          backgroundColor: '#0e1118',
+          borderColor: '#2a3347',
+          borderWidth: 1,
+          titleColor: '#c8d4e8',
+          bodyColor: '#c8d4e8',
+          titleFont: { family: "'Share Tech Mono', monospace", size: 11 },
+          bodyFont:  { family: "'Share Tech Mono', monospace", size: 11 },
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + ' ms' : 'N/A'}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#5a6a82',
+            font: { family: "'Share Tech Mono', monospace", size: 10 },
+            maxTicksLimit: 10,
+            maxRotation: 0,
+          },
+          grid: { color: '#1e2535' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: '#5a6a82',
+            font: { family: "'Share Tech Mono', monospace", size: 10 },
+            callback: v => v + ' ms'
+          },
+          grid: { color: '#1e2535' },
+          title: {
+            display: true,
+            text: 'Latency (ms)',
+            color: '#5a6a82',
+            font: { family: "'Share Tech Mono', monospace", size: 11 }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Populate the device filter dropdown ──────────────────────────
+function populateFilter(data) {
+  const sel = document.getElementById('deviceFilter');
+  const existing = [...sel.options].map(o => o.value);
+  Object.keys(data).forEach(name => {
+    if (!existing.includes(name)) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+// ── Apply selected filter and redraw ─────────────────────────────
+function applyDeviceFilter() {
+  activeFilter = document.getElementById('deviceFilter').value;
+  const filtered = activeFilter === 'all'
+    ? allStatsData
+    : { [activeFilter]: allStatsData[activeFilter] || [] };
+  buildChart(filtered);
+}
+
+// ── Fetch data from /api/stats and refresh chart ─────────────────
+async function refreshGraph() {
+  try {
+    const res  = await fetch('/api/stats');
+    const data = await res.json();
+    allStatsData = data;
+    populateFilter(data);
+    applyDeviceFilter();
+  } catch (e) {
+    console.warn('Graph fetch failed:', e);
+  }
+}
+
+// ── Quick ping ────────────────────────────────────────────────────
+async function quickPing() {
+  const host     = document.getElementById('pingHost').value.trim();
+  const resultEl = document.getElementById('pingResult');
+  if (!host) return;
+
+  resultEl.className   = 'ping-result';
+  resultEl.textContent = 'Pinging…';
+
+  const res  = await fetch('/api/ping', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json',
+                'X-CSRFToken':  '{{ csrf_token() }}' },
+    body:    JSON.stringify({ host })
+  });
+  const data = await res.json();
+
+  if (data.status === 'UP') {
+    resultEl.className = 'ping-result ping-up';
+    resultEl.innerHTML = `🟢 <strong>${host}</strong> is UP &nbsp;|&nbsp; Latency: ${
+      data.latency_ms ? data.latency_ms.toFixed(1) + ' ms' : 'N/A'
+    }`;
+    // Refresh graph immediately after a ping so new point appears
+    setTimeout(refreshGraph, 500);
+  } else {
+    resultEl.className = 'ping-result ping-down';
+    resultEl.innerHTML = `🔴 <strong>${host}</strong> is DOWN`;
+  }
+}
+
+// ── Auto-refresh device tiles every 30s ──────────────────────────
+setInterval(async () => {
+  try {
+    const res   = await fetch('/api/devices/status');
+    const items = await res.json();
+    items.forEach(d => {
+      const tile = document.querySelector(`.device-tile[data-device-id="${d.id}"]`);
+      if (!tile) return;
+      tile.className = `device-tile ${d.status.toLowerCase()}`;
+      const badge = tile.querySelector('.badge');
+      if (badge) {
+        badge.textContent = d.status;
+        badge.className   = `badge badge-${d.status.toLowerCase()}`;
+      }
+      const lat = tile.querySelector('.latency');
+      if (lat && d.latency_ms) lat.textContent = d.latency_ms.toFixed(1) + ' ms';
+    });
+  } catch (e) {}
+}, 30000);
+
+// ── Start ─────────────────────────────────────────────────────────
+refreshGraph();                          // load immediately
+setInterval(refreshGraph, 10000);        // then every 10 seconds
+</script>
+{% endblock %}
